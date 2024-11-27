@@ -1,52 +1,61 @@
 import { buildApplication, buildCommand, type CommandContext } from "@stricli/core";
-import { name, version, description } from "../package.json";
-import path from "node:path";
-
-interface Flags {
-    dirInput?: string;
-    fileInput?: string;
-}
+import { description, name, version } from "../package.json";
+import * as pathlib from "node:path";
+import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 const command = buildCommand({
-    func(this: CommandContext, { dirInput, fileInput }: Flags): void {
+    async func(this: CommandContext, _: {}, ...paths: string[]) {
+        let inputContent: { pathname: string; content: string }[] = [];
 
-        if (dirInput === undefined && fileInput === undefined) {
-            this.process.stdout.write("Directory input not provided.\n");
+        if (!paths) {
+            this.process.stdout.write("No input provided.\n");
             return;
         }
 
-        if (dirInput !== undefined && fileInput !== undefined ||
-            dirInput === undefined && fileInput === undefined) {
-            this.process.stdout.write("Please provide either a directory input or a file input, but not both.\n");
-            return;
+        for (const path of paths) {
+            const index = paths.indexOf(path);
+
+            if (pathlib.isAbsolute(paths[index]!)) {
+                this.process.stdout.write("Directory input mustn't be an absolute path.\n");
+                return;
+            }
+
+            if (!existsSync(pathlib.join(process.cwd(), path))) {
+                this.process.stdout.write(`Path ${index + 1} doesn't exist.\n`);
+                return;
+            }
+
+            try {
+                const data = await fs.readFile(pathlib.join(process.cwd(), path), { encoding: "utf-8" });
+
+                inputContent.push({
+                    pathname: path,
+                    content: String.raw`${data}`,
+                });
+            } catch (err: any) {
+                this.process.stdout.write(`Error reading path ${index + 1}: ${err.message}\n`);
+            }
         }
 
-        this.process.stdout.write(`Hello!\n${dirInput ? "Directory" : "File"} input: ${dirInput || fileInput}\n`);
+        inputContent.forEach((content, index) => {
+            this.process.stdout.write(`Path ${index + 1}:\n${content.pathname}\n${content.content}\n`);
+        });
     },
     parameters: {
-        flags: {
-            dirInput: {
-                kind: "parsed",
-                brief: "Directory input as a path",
+        positional: {
+            kind: "array",
+            parameter: {
+                brief: "File paths",
                 parse: String,
-                optional: true,
-            },
-            fileInput: {
-                kind: "parsed",
-                brief: "File input as a path",
-                parse: String,
-                optional: true,
             },
         },
-        // aliases: {
-        //     di: "dirInput",
-        // },
     },
     docs: {
         brief: description,
         customUsage: [
-            "--dirInput /path/to/directory",
-            "--fileInput /path/to/directory",
+            "/path/to/file /path/to/file ...",
+            "/path/to/directory",
         ],
     }
 });
