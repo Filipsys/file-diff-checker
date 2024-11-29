@@ -4,7 +4,6 @@ import * as pathlib from "node:path";
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createHmac } from "node:crypto";
-// import path from "node:path";
 
 const command = buildCommand({
     async func(this: CommandContext, _: {}, ...paths: string[]) {
@@ -14,8 +13,10 @@ const command = buildCommand({
         let DEBUG_MODE = false;
 
         // Check if the debug flag is enabled.
-        for (const [key] of Object.entries(_))
-            if (key === "debug") DEBUG_MODE = true;
+        for (const [key, value] of Object.entries(_)) {
+            if (key === "debug" && value === true)
+                DEBUG_MODE = true;
+        }
 
         // Hashing function to compare file contents.
         // Uses SHA-256 to hash the content and returns
@@ -68,9 +69,9 @@ const command = buildCommand({
                 if (i === index) continue;
                 if (exactCheck(content.content) !== inputHashes[i]?.hash) continue;
 
-                DEBUG_MODE
-                    ? this.process.stdout.write(`Path ${index + 1} does not differ from path ${i + 1}.\n`)
-                    : null;
+                if (DEBUG_MODE) {
+                    this.process.stdout.write(`Path ${index + 1} does not differ from path ${i + 1}.\n`)
+                }
 
                 if (!exactContents.includes(content.pathname)) {
                     exactContents.push(content.pathname);
@@ -78,15 +79,14 @@ const command = buildCommand({
             }
         });
 
-        DEBUG_MODE
-        ? (
+        if (DEBUG_MODE) {
             inputContent.forEach((content) => {
-            this.process.stdout.write(`Path: ${content.pathname}\n`);
-            }),
+                this.process.stdout.write(`Path: ${content.pathname}\n`);
+            });
             exactContents.forEach((content) => {
                 this.process.stdout.write(`Exact: ${content}\n`);
-            })
-        ) : null;
+            });
+        }
 
         // Outputting the comparison summary.
         this.process.stdout.write("===[ Comparison summary ]===\n");
@@ -111,6 +111,11 @@ const command = buildCommand({
             debug: {
                 kind: "boolean",
                 brief: "Enable debug mode",
+                optional: true,
+            },
+            minify: {
+                kind: "boolean",
+                brief: "Enable minification",
                 optional: true,
             }
         },
