@@ -1,9 +1,9 @@
 import { buildApplication, buildCommand, type CommandContext } from "@stricli/core";
+import { exactCheck, checkLineSimilarity } from "./lib/functions";
 import { description, name, version } from "../package.json";
+import { existsSync } from "node:fs";
 import * as pathlib from "node:path";
 import fs from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { createHmac } from "node:crypto";
 
 const command = buildCommand({
     async func(this: CommandContext, _: {}, ...paths: string[]) {
@@ -17,13 +17,6 @@ const command = buildCommand({
             if (key === "debug" && value === true)
                 DEBUG_MODE = true;
         }
-
-        // Hashing function to compare file contents.
-        // Uses SHA-256 to hash the content and returns
-        // the hash to be ready for comparison.
-        const exactCheck = (data: string) => {
-            return createHmac("sha256", data).digest("hex");
-        };
 
         if (!paths) {
             this.process.stdout.write("No input provided.\n");
@@ -98,6 +91,9 @@ const command = buildCommand({
                 : "No identical files found.\n"
         );
         this.process.stdout.write("\n");
+        this.process.stdout.write("===[ Detailed comparison ]===\n");
+        // @ts-ignore
+        this.process.stdout.write(`Path similarities percentage (full lines): ${checkLineSimilarity(inputContent[0].content, inputContent[1].content)}\n`);
     },
     parameters: {
         positional: {
